@@ -1,0 +1,25 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a1220; color: #cfe3ef; font-family: "Consolas", "JetBrains Mono", monospace; min-height: 100vh; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; border-bottom: 1px solid #1c2c40; flex-wrap: wrap; gap: 10px; }
+h1 { font-family: system-ui, sans-serif; font-size: 1.3rem; color: #fff; }
+h1 span { color: #2ee6a6; }
+.badge { background: #12a37a; color: #fff; padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-family: system-ui; font-weight: 600; }
+main { display: grid; grid-template-columns: 1fr 320px; gap: 18px; padding: 18px 28px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.scope { background: #070d18; border: 1px solid #1c2c40; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; }
+.scope-head { display: flex; justify-content: space-between; font-size: .75rem; color: #6f8aa3; margin-bottom: 8px; }
+#scope { width: 100%; height: 480px; display: block; }
+.legend { display: flex; gap: 18px; font-size: .75rem; margin-top: 8px; color: #8fa6bb; }
+.legend i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; }
+.panel { background: #0d1828; border: 1px solid #1c2c40; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.panel h2 { font-size: .72rem; color: #6f8aa3; letter-spacing: 1px; margin-top: 6px; }
+label { font-size: .8rem; display: block; }
+label b { color: #2ee6a6; }
+input[type=range] { width: 100%; accent-color: #2ee6a6; margin-top: 4px; }
+.chk { display: flex; gap: 6px; align-items: center; }
+.btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+button { background: #13253b; color: #cfe3ef; border: 1px solid #24405f; border-radius: 6px; padding: 7px; cursor: pointer; font-family: inherit; font-size: .78rem; }
+button:hover { background: #1b3452; border-color: #2ee6a6; }
+.telemetry { border: 1px solid #12a37a; border-radius: 8px; padding: 10px; background: #071510; }
+.big { color: #2ee6a6; font-size: .95rem; margin: 6px 0 8px; }
+.row { display: flex; justify-content: space-between; font-size: .78rem; padding: 2px 0; border-top: 1px dashed #163a2e; }

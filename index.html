@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laboratorio de Control PID & Telemetría en Tiempo Real</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Laboratorio de Control PID <span>&amp; Telemetría en Tiempo Real</span></h1>
+  <span class="badge">Mecatrónica &amp; Control</span>
+</header>
+
+<main>
+  <section class="scope">
+    <div class="scope-head">
+      <span>OSCILOSCOPIO // y(t) vs r(t)</span>
+      <span id="clock">t = 0.00 s</span>
+    </div>
+    <canvas id="scope"></canvas>
+    <div class="legend">
+      <span><i style="background:#f5c542"></i>Referencia r(t)</span>
+      <span><i style="background:#2ee6a6"></i>Salida y(t)</span>
+      <span><i style="background:#ff6b6b"></i>Control u(t)</span>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <h2>SINTONIZACIÓN PID</h2>
+    <label>Kp = <b id="kpV"></b><input type="range" id="kp" min="0" max="20" step="0.1" value="4"></label>
+    <label>Ki = <b id="kiV"></b><input type="range" id="ki" min="0" max="10" step="0.05" value="1.5"></label>
+    <label>Kd = <b id="kdV"></b><input type="range" id="kd" min="0" max="5" step="0.01" value="0.6"></label>
+
+    <h2>PLANTA (2º ORDEN)</h2>
+    <label>ωn = <b id="wnV"></b> rad/s<input type="range" id="wn" min="0.5" max="10" step="0.1" value="3"></label>
+    <label>ζ = <b id="zV"></b><input type="range" id="z" min="0.05" max="2" step="0.01" value="0.3"></label>
+    <label>Setpoint = <b id="spV"></b><input type="range" id="sp" min="-2" max="2" step="0.1" value="1"></label>
+
+    <div class="btns">
+      <button id="step">Escalón</button>
+      <button id="dist">Perturbación</button>
+      <button id="pause">Pausa</button>
+      <button id="reset">Reset</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="noise"> Ruido de sensor</label>
+
+    <div class="telemetry">
+      <h2>OVERSHOOT // SETTLING</h2>
+      <div class="big">Mp: <b id="mp">--</b> · Ts: <b id="ts">--</b></div>
+      <div class="row"><span>e(t)</span><b id="err">0</b></div>
+      <div class="row"><span>u(t)</span><b id="u">0</b></div>
+      <div class="row"><span>IAE</span><b id="iae">0</b></div>
+      <div class="row"><span>Estado</span><b id="state">--</b></div>
+    </div>
+  </aside>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
