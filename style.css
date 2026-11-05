@@ -1,25 +1,468 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0a1220; color: #cfe3ef; font-family: "Consolas", "JetBrains Mono", monospace; min-height: 100vh; }
-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; border-bottom: 1px solid #1c2c40; flex-wrap: wrap; gap: 10px; }
-h1 { font-family: system-ui, sans-serif; font-size: 1.3rem; color: #fff; }
-h1 span { color: #2ee6a6; }
-.badge { background: #12a37a; color: #fff; padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-family: system-ui; font-weight: 600; }
-main { display: grid; grid-template-columns: 1fr 320px; gap: 18px; padding: 18px 28px; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
-.scope { background: #070d18; border: 1px solid #1c2c40; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; }
-.scope-head { display: flex; justify-content: space-between; font-size: .75rem; color: #6f8aa3; margin-bottom: 8px; }
-#scope { width: 100%; height: 480px; display: block; }
-.legend { display: flex; gap: 18px; font-size: .75rem; margin-top: 8px; color: #8fa6bb; }
-.legend i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; }
-.panel { background: #0d1828; border: 1px solid #1c2c40; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-.panel h2 { font-size: .72rem; color: #6f8aa3; letter-spacing: 1px; margin-top: 6px; }
-label { font-size: .8rem; display: block; }
-label b { color: #2ee6a6; }
-input[type=range] { width: 100%; accent-color: #2ee6a6; margin-top: 4px; }
-.chk { display: flex; gap: 6px; align-items: center; }
-.btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-button { background: #13253b; color: #cfe3ef; border: 1px solid #24405f; border-radius: 6px; padding: 7px; cursor: pointer; font-family: inherit; font-size: .78rem; }
-button:hover { background: #1b3452; border-color: #2ee6a6; }
-.telemetry { border: 1px solid #12a37a; border-radius: 8px; padding: 10px; background: #071510; }
-.big { color: #2ee6a6; font-size: .95rem; margin: 6px 0 8px; }
-.row { display: flex; justify-content: space-between; font-size: .78rem; padding: 2px 0; border-top: 1px dashed #163a2e; }
+/**
+ * @file style.css
+ * @description Sistema de Diseño Luxury Editorial & Bento Grid para el Laboratorio PID.
+ * Paleta: Obsidiana OLED (#0a0a0c), Titanio (#141417), Oro Champán (#c5a059) y Azul Óptico (#2997ff).
+ */
+
+:root {
+  --bg-base: #0a0a0c;
+  --bg-surface: #141417;
+  --bg-surface-elevated: rgba(22, 22, 28, 0.75);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+
+  --text-primary: #f5f5f7;
+  --text-secondary: #8e8e93;
+  --text-muted: #545458;
+
+  --accent-gold: #c5a059;
+  --accent-gold-glow: rgba(197, 160, 89, 0.15);
+  --accent-blue: #2997ff;
+  --accent-blue-glow: rgba(41, 151, 255, 0.15);
+  --accent-emerald: #2ee6a6;
+  --accent-crimson: #ff5252;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 20px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tabular, .tabular-time, .slider-readout {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================================
+   1. Barra de Navegación Superior
+   ========================================================================= */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-emerald);
+  box-shadow: 0 0 10px rgba(46, 230, 166, 0.5);
+}
+
+.brand-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.brand-title span {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.brand-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preset-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preset-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.select-input {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease-spring);
+}
+
+.select-input:hover, .select-input:focus {
+  border-color: var(--border-hover);
+}
+
+.badge {
+  background: rgba(41, 151, 255, 0.12);
+  color: var(--accent-blue);
+  border: 1px solid rgba(41, 151, 255, 0.25);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* =========================================================================
+   2. Layout Principal Bento Grid
+   ========================================================================= */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1080px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bento-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 12px 32px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* =========================================================================
+   3. Osciloscopio Digital
+   ========================================================================= */
+.card-scope {
+  gap: 12px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.scope-clock-badge {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.canvas-container {
+  width: 100%;
+  height: 500px;
+  background: #060608;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  position: relative;
+}
+
+#scope {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.scope-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding-top: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.line-ref { background: var(--accent-gold); }
+.line-out { background: var(--accent-blue); }
+.line-ctrl { background: var(--accent-crimson); }
+.legend-band {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  background: rgba(46, 230, 166, 0.15);
+  border: 1px dashed rgba(46, 230, 166, 0.4);
+  border-radius: 2px;
+}
+
+/* =========================================================================
+   4. Paneles Laterales y Telemetría
+   ========================================================================= */
+.side-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-header-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.state-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(245, 197, 66, 0.12);
+  color: #f5c542;
+  border: 1px solid rgba(245, 197, 66, 0.3);
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.metric-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.metric-val {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.telemetry-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.data-row b {
+  color: var(--text-primary);
+}
+
+/* =========================================================================
+   5. Sliders de Sintonización y Planta
+   ========================================================================= */
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.slider-readout {
+  color: var(--accent-gold);
+  font-size: 0.82rem;
+}
+
+.unit-readout {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.unit-readout b {
+  color: var(--accent-gold);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s var(--ease-spring);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-spring), background 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background: var(--accent-gold);
+}
+
+/* =========================================================================
+   6. Botones y Casilla de Ruido
+   ========================================================================= */
+.btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-hover);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: rgba(41, 151, 255, 0.12);
+  color: var(--accent-blue);
+  border-color: rgba(41, 151, 255, 0.3);
+}
+
+.btn-primary:hover {
+  background: rgba(41, 151, 255, 0.22);
+  border-color: var(--accent-blue);
+}
+
+.btn-warning {
+  background: rgba(245, 197, 66, 0.1);
+  color: var(--accent-gold);
+  border-color: rgba(245, 197, 66, 0.25);
+}
+
+.btn-warning:hover {
+  background: rgba(245, 197, 66, 0.18);
+  border-color: var(--accent-gold);
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+
+.checkbox-container input {
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+}

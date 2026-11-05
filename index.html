@@ -1,60 +1,204 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Laboratorio de Control PID & Telemetría en Tiempo Real</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laboratorio de Control PID & Telemetría en Tiempo Real</title>
+  <meta name="description" content="Simulador interactivo en lazo cerrado para sintonizar controladores PID sobre plantas electromecánicas de 2º orden con integrador numérico a 500 Hz y osciloscopio digital." />
+
+  <!-- Tipografía Editorial de Precisión -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<header>
-  <h1>Laboratorio de Control PID <span>&amp; Telemetría en Tiempo Real</span></h1>
-  <span class="badge">Mecatrónica &amp; Control</span>
-</header>
 
-<main>
-  <section class="scope">
-    <div class="scope-head">
-      <span>OSCILOSCOPIO // y(t) vs r(t)</span>
-      <span id="clock">t = 0.00 s</span>
+  <!-- Barra de Navegación de Alta Precisión -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="status-indicator" aria-hidden="true"></div>
+      <div>
+        <h1 class="brand-title">Laboratorio PID <span>&amp; Telemetría Realtime</span></h1>
+        <p class="brand-subtitle">Simulador de Control en Lazo Cerrado · Integración 500 Hz (Euler Semi-implícito)</p>
+      </div>
     </div>
-    <canvas id="scope"></canvas>
-    <div class="legend">
-      <span><i style="background:#f5c542"></i>Referencia r(t)</span>
-      <span><i style="background:#2ee6a6"></i>Salida y(t)</span>
-      <span><i style="background:#ff6b6b"></i>Control u(t)</span>
+
+    <div class="header-actions">
+      <!-- Selector de Presets de Planta -->
+      <div class="preset-wrapper">
+        <label for="preset-select" class="preset-label">Configuración:</label>
+        <select id="preset-select" class="select-input">
+          <option value="underdamped">Subamortiguado (ζ = 0.30)</option>
+          <option value="critical">Críticamente Amortiguado (ζ = 1.00)</option>
+          <option value="overdamped">Sobreamortiguado (ζ = 1.80)</option>
+          <option value="fast">Respuesta Rápida (ωn = 5.0, ζ = 0.50)</option>
+        </select>
+      </div>
+
+      <button id="export-csv" class="btn btn-secondary" title="Descargar registro de telemetría en formato CSV">
+        <span>↓ Exportar CSV</span>
+      </button>
+
+      <span class="badge">Mecatrónica &amp; Control</span>
     </div>
-  </section>
+  </header>
 
-  <aside class="panel">
-    <h2>SINTONIZACIÓN PID</h2>
-    <label>Kp = <b id="kpV"></b><input type="range" id="kp" min="0" max="20" step="0.1" value="4"></label>
-    <label>Ki = <b id="kiV"></b><input type="range" id="ki" min="0" max="10" step="0.05" value="1.5"></label>
-    <label>Kd = <b id="kdV"></b><input type="range" id="kd" min="0" max="5" step="0.01" value="0.6"></label>
+  <!-- Escenario Principal en Bento Grid -->
+  <main class="main-layout">
 
-    <h2>PLANTA (2º ORDEN)</h2>
-    <label>ωn = <b id="wnV"></b> rad/s<input type="range" id="wn" min="0.5" max="10" step="0.1" value="3"></label>
-    <label>ζ = <b id="zV"></b><input type="range" id="z" min="0.05" max="2" step="0.01" value="0.3"></label>
-    <label>Setpoint = <b id="spV"></b><input type="range" id="sp" min="-2" max="2" step="0.1" value="1"></label>
+    <!-- Tarjeta Principal: Osciloscopio Digital -->
+    <section class="bento-card card-scope">
+      <div class="card-header">
+        <div class="scope-title-group">
+          <span class="card-eyebrow">CANAL ANALÓGICO VIRTUAL</span>
+          <h2 class="card-title">Respuesta Dinámica: y(t) vs r(t)</h2>
+        </div>
+        <div class="scope-clock-badge">
+          <span id="clock" class="tabular-time">t = 0.00 s</span>
+        </div>
+      </div>
 
-    <div class="btns">
-      <button id="step">Escalón</button>
-      <button id="dist">Perturbación</button>
-      <button id="pause">Pausa</button>
-      <button id="reset">Reset</button>
-    </div>
-    <label class="chk"><input type="checkbox" id="noise"> Ruido de sensor</label>
+      <div class="canvas-container">
+        <canvas id="scope"></canvas>
+      </div>
 
-    <div class="telemetry">
-      <h2>OVERSHOOT // SETTLING</h2>
-      <div class="big">Mp: <b id="mp">--</b> · Ts: <b id="ts">--</b></div>
-      <div class="row"><span>e(t)</span><b id="err">0</b></div>
-      <div class="row"><span>u(t)</span><b id="u">0</b></div>
-      <div class="row"><span>IAE</span><b id="iae">0</b></div>
-      <div class="row"><span>Estado</span><b id="state">--</b></div>
-    </div>
-  </aside>
-</main>
-<script src="app.js"></script>
+      <div class="scope-legend">
+        <div class="legend-item">
+          <span class="legend-line line-ref"></span>
+          <span>Referencia r(t)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-line line-out"></span>
+          <span>Salida de Planta y(t)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-line line-ctrl"></span>
+          <span>Control u(t) × 0.1</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-band"></span>
+          <span>Banda de Asentamiento ±2%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Lateral Bento: Controles & Telemetría -->
+    <aside class="side-controls">
+
+      <!-- Módulo 1: Telemetría de Alta Resolución -->
+      <section class="bento-card card-telemetry">
+        <div class="card-header-compact">
+          <span class="card-eyebrow">MÉTRICAS FORMALES DE RESPUESTA</span>
+          <span id="state" class="state-badge">TRANSITORIO</span>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="metric-cell">
+            <span class="metric-label">Sobreimpulso (Mp)</span>
+            <b id="mp" class="metric-val tabular">--</b>
+          </div>
+          <div class="metric-cell">
+            <span class="metric-label">Asentamiento (Ts ±2%)</span>
+            <b id="ts" class="metric-val tabular">--</b>
+          </div>
+        </div>
+
+        <div class="telemetry-rows">
+          <div class="data-row">
+            <span>Error instantáneo e(t)</span>
+            <b id="err" class="tabular">0.0000</b>
+          </div>
+          <div class="data-row">
+            <span>Acción de control u(t)</span>
+            <b id="u" class="tabular">0.000</b>
+          </div>
+          <div class="data-row">
+            <span>Error Absoluto Acumulado (IAE)</span>
+            <b id="iae" class="tabular">0.000</b>
+          </div>
+        </div>
+      </section>
+
+      <!-- Módulo 2: Sintonización PID Industrial -->
+      <section class="bento-card card-tuning">
+        <span class="card-eyebrow">CONTROLADOR PID (CON ANTI-WINDUP)</span>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="kp">Ganancia Proporcional (Kp)</label>
+            <b id="kpV" class="slider-readout tabular">4.00</b>
+          </div>
+          <input type="range" id="kp" min="0" max="25" step="0.1" value="4.0" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="ki">Ganancia Integral (Ki)</label>
+            <b id="kiV" class="slider-readout tabular">1.50</b>
+          </div>
+          <input type="range" id="ki" min="0" max="15" step="0.05" value="1.5" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="kd">Ganancia Derivativa (Kd)</label>
+            <b id="kdV" class="slider-readout tabular">0.60</b>
+          </div>
+          <input type="range" id="kd" min="0" max="8" step="0.02" value="0.6" />
+        </div>
+      </section>
+
+      <!-- Módulo 3: Parámetros de la Planta Física -->
+      <section class="bento-card card-plant">
+        <span class="card-eyebrow">PLANTA DINÁMICA (2º ORDEN)</span>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="wn">Frecuencia Natural (ωn)</label>
+            <span class="unit-readout"><b id="wnV" class="tabular">3.00</b> rad/s</span>
+          </div>
+          <input type="range" id="wn" min="0.5" max="10" step="0.1" value="3.0" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="z">Amortiguamiento (ζ)</label>
+            <b id="zV" class="slider-readout tabular">0.30</b>
+          </div>
+          <input type="range" id="z" min="0.02" max="2.5" step="0.01" value="0.30" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="sp">Referencia / Setpoint</label>
+            <b id="spV" class="slider-readout tabular">1.00</b>
+          </div>
+          <input type="range" id="sp" min="-2" max="2" step="0.1" value="1.0" />
+        </div>
+      </section>
+
+      <!-- Módulo 4: Operaciones de Ensayo -->
+      <section class="bento-card card-actions">
+        <div class="btn-grid">
+          <button id="step" class="btn btn-primary" title="Invertir escalón de setpoint">Escalón</button>
+          <button id="dist" class="btn btn-warning" title="Inyectar perturbación de carga externa">Perturbación</button>
+          <button id="pause" class="btn btn-secondary">Pausa</button>
+          <button id="reset" class="btn btn-secondary">Reset</button>
+        </div>
+
+        <label class="checkbox-container">
+          <input type="checkbox" id="noise" />
+          <span class="checkmark"></span>
+          <span class="checkbox-label">Inyectar ruido de medición estocástico</span>
+        </label>
+      </section>
+
+    </aside>
+  </main>
+
+  <!-- Orquestador Modular en ES Modules -->
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
