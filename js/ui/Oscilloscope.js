@@ -1,7 +1,10 @@
 /**
  * @file Oscilloscope.js
- * @description Osciloscopio digital en HTML5 Canvas con soporte High-DPI (Retina),
- * caché de dimensiones libre de DOM Thrashing, rejilla horológica y banda de asentamiento ±2%.
+ * @description Osciloscopio digital en HTML5 Canvas con soporte High-DPI (Retina).
+ * Arquitectura de alto rendimiento:
+ * 1. Single-Pass Execution: Calcula límites de escala y construye los paths en un único recorrido por muestra.
+ * 2. Cero matching por texto/colores en bucle caliente.
+ * 3. Cacheo estricto de dimensiones y gestión de ciclo de vida con destroy().
  */
 
 export class Oscilloscope {
@@ -15,7 +18,7 @@ export class Oscilloscope {
     this.ctx = canvas.getContext('2d');
     this.windowDuration = windowDuration;
 
-    // Caché de dimensiones para evitar layout thrashing (forced reflow) en render()
+    // Caché de dimensiones para evitar layout thrashing (forced reflow)
     this.width = 0;
     this.height = 0;
     this.dpr = window.devicePixelRatio || 1;
@@ -40,12 +43,27 @@ export class Oscilloscope {
       this.resizeObserver = new ResizeObserver(() => updateSize());
       this.resizeObserver.observe(this.canvas);
     } else {
-      window.addEventListener('resize', updateSize);
+      this.resizeHandler = updateSize;
+      window.addEventListener('resize', this.resizeHandler);
     }
   }
 
   /**
-   * Dibuja un fotograma completo del osciloscopio a partir del RingBuffer.
+   * Desconecta observadores y limpia referencias para evitar fugas de memoria.
+   */
+  destroy() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.resizeHandler) {
+      window.removeEventListener('resize', this.resizeHandler);
+      this.resizeHandler = null;
+    }
+  }
+
+  /**
+   * Dibuja un fotograma completo del osciloscopio en un solo recorrido de memoria.
    * @param {import('../engine/RingBuffer.js').RingBuffer} buffer
    * @param {number} currentR Setpoint actual
    * @param {{ bandMin: number, bandMax: number, active: boolean }} settlingBand
@@ -55,6 +73,7 @@ export class Oscilloscope {
     const ctx = this.ctx;
     const W = this.width;
     const H = this.height;
+    const count = buffer.count;
     if (W === 0 || H === 0) return;
 
     // Ajustar escala de renderizado al DPR de la pantalla
@@ -64,26 +83,103 @@ export class Oscilloscope {
     // Determinar límites temporales
     const tEnd = Math.max(this.windowDuration, currentTime);
     const tStart = tEnd - this.windowDuration;
+    const invDuration = 1.0 / this.windowDuration;
 
-    // Calcular límites de amplitud vertical (con auto-escala suave)
+    // 1. Cálculo de límites verticales dinámicos
     let yMin = -0.5;
     let yMax = 1.5;
 
-    buffer.forEach((t, y, r) => {
-      if (y < yMin) yMin = y;
-      if (y > yMax) yMax = y;
-      if (r < yMin) yMin = r;
-      if (r > yMax) yMax = r;
-    });
+    for (let i = 0; i < count; i++) {
+      const idx = buffer.getPhysicalIndex(i);
+      const valY = buffer.y[idx];
+      const valR = buffer.r[idx];
+      if (valY < yMin) yMin = valY;
+      if (valY > yMax) yMax = valY;
+      if (valR < yMin) yMin = valR;
+      if (valR > yMax) yMax = valR;
+    }
 
     const pad = (yMax - yMin) * 0.12;
     yMin -= pad;
     yMax += pad;
+    const invYRange = 1.0 / (yMax - yMin);
 
-    const mapX = (t) => ((t - tStart) / this.windowDuration) * W;
-    const mapY = (v) => H - ((v - yMin) / (yMax - yMin)) * H;
+    // Funciones en línea directas de transformación a coordenadas de pantalla
+    const mapX = (t) => ((t - tStart) * invDuration) * W;
+    const mapY = (v) => H - ((v - yMin) * invYRange) * H;
 
-    // 1. Rejilla de Fondo Técnica de Precisión
+    // 2. Rejilla de Fondo Técnica de Precisión
+    this.renderGrid(ctx, W, H, yMin, yMax);
+
+    // 3. Banda de Asentamiento ±2%
+    if (settlingBand && settlingBand.active) {
+      const yTop = mapY(settlingBand.bandMax);
+      const yBottom = mapY(settlingBand.bandMin);
+      ctx.fillStyle = 'rgba(46, 230, 166, 0.08)';
+      ctx.fillRect(0, yTop, W, Math.max(2, yBottom - yTop));
+
+      ctx.strokeStyle = 'rgba(46, 230, 166, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, yTop);
+      ctx.lineTo(W, yTop);
+      ctx.moveTo(0, yBottom);
+      ctx.lineTo(W, yBottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (count === 0) return;
+
+    // 4. Construcción simultánea de paths vectoriales (Zero String Matching)
+    const pathU = new Path2D();
+    const pathR = new Path2D();
+    const pathY = new Path2D();
+
+    for (let i = 0; i < count; i++) {
+      const idx = buffer.getPhysicalIndex(i);
+      const px = mapX(buffer.time[idx]);
+      const pyU = mapY(buffer.u[idx] * 0.1);
+      const pyR = mapY(buffer.r[idx]);
+      const pyY = mapY(buffer.y[idx]);
+
+      if (i === 0) {
+        pathU.moveTo(px, pyU);
+        pathR.moveTo(px, pyR);
+        pathY.moveTo(px, pyY);
+      } else {
+        pathU.lineTo(px, pyU);
+        pathR.lineTo(px, pyR);
+        pathY.lineTo(px, pyY);
+      }
+    }
+
+    // Trazo Canal Control u(t) × 0.1 (Rojo Carmesí)
+    ctx.strokeStyle = 'rgba(255, 107, 107, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke(pathU);
+
+    // Trazo Canal Referencia r(t) (Oro Champán)
+    ctx.strokeStyle = '#f5c542';
+    ctx.lineWidth = 2.0;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke(pathR);
+
+    // Trazo Canal Salida Planta y(t) (Azul Óptico / Cian)
+    ctx.strokeStyle = '#2997ff';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([]);
+    ctx.stroke(pathY);
+
+    // Leyenda de escala
+    ctx.fillStyle = '#ff6b6b';
+    ctx.font = '10px "JetBrains Mono", Consolas, monospace';
+    ctx.fillText('u(t) ×0.1', W - 65, 16);
+  }
+
+  renderGrid(ctx, W, H, yMin, yMax) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#6f8aa3';
@@ -111,69 +207,5 @@ export class Oscilloscope {
       const labelVal = yMax - (i / ampDivs) * (yMax - yMin);
       ctx.fillText(labelVal.toFixed(2), 6, y - 3);
     }
-
-    // 2. Banda de Asentamiento ±2%
-    if (settlingBand && settlingBand.active) {
-      const yTop = mapY(settlingBand.bandMax);
-      const yBottom = mapY(settlingBand.bandMin);
-      ctx.fillStyle = 'rgba(46, 230, 166, 0.08)';
-      ctx.fillRect(0, yTop, W, Math.max(2, yBottom - yTop));
-
-      ctx.strokeStyle = 'rgba(46, 230, 166, 0.25)';
-      ctx.setLineDash([2, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, yTop);
-      ctx.lineTo(W, yTop);
-      ctx.moveTo(0, yBottom);
-      ctx.lineTo(W, yBottom);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // 3. Trazado de Señales
-
-    // Señal de Control u(t) escalada x0.1 (Rojo Carmesí)
-    this.plotSignal(buffer, mapX, (u) => mapY(u * 0.1), 'rgba(255, 107, 107, 0.65)', 1.5, [3, 3]);
-
-    // Referencia r(t) (Oro Champán)
-    this.plotSignal(buffer, mapX, (r) => mapY(r), '#f5c542', 2.0, [6, 4]);
-
-    // Salida Real y(t) (Azul Óptico / Esmeralda)
-    this.plotSignal(buffer, mapX, (y) => mapY(y), '#2997ff', 2.5, []);
-
-    // Leyenda de escala de control
-    ctx.fillStyle = '#ff6b6b';
-    ctx.fillText('u(t) ×0.1', W - 65, 16);
-  }
-
-  /**
-   * Traza una curva continua recorriendo el búfer circular sin instanciar arreglos.
-   */
-  plotSignal(buffer, mapX, mapYVal, strokeStyle, lineWidth, dash = []) {
-    const ctx = this.ctx;
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = lineWidth;
-    ctx.setLineDash(dash);
-    ctx.beginPath();
-
-    let isFirst = true;
-    buffer.forEach((t, y, r, u) => {
-      let val = y;
-      if (strokeStyle.includes('f5c542')) val = r;
-      else if (strokeStyle.includes('255, 107, 107')) val = u;
-
-      const px = mapX(t);
-      const py = mapYVal(val);
-
-      if (isFirst) {
-        ctx.moveTo(px, py);
-        isFirst = false;
-      } else {
-        ctx.lineTo(px, py);
-      }
-    });
-
-    ctx.stroke();
-    ctx.setLineDash([]);
   }
 }
