@@ -2,7 +2,8 @@
  * @file Plant.js
  * @description Modelo de planta electromecánica continua de segundo orden.
  * Ecuación diferencial: y'' + 2ζωn·y' + ωn²·y = ωn²·(u + d)
- * Integra numéricamente a paso fijo mediante el método de Euler semi-implícito.
+ * Integra numéricamente a paso fijo mediante el método simpléctico / Euler semi-implícito.
+ * Incorpora detección formal de divergencia dinámica y desacoplamiento de fallos.
  */
 
 export class Plant {
@@ -15,7 +16,7 @@ export class Plant {
     this.wn = wn;
     this.zeta = zeta;
 
-    // Variables de estado
+    // Variables de estado dinámico
     this.t = 0;
     this.y = 0;   // Posición / salida
     this.v = 0;   // Velocidad (dy/dt)
@@ -25,20 +26,23 @@ export class Plant {
     this.disturbanceUntil = 0;
     this.noiseEnabled = false;
     this.noiseAmplitude = 0.04;
+
+    // Estado de estabilidad numérica
+    this.hasDiverged = false;
   }
 
   /**
    * Actualiza los parámetros físicos del sistema dinámico.
-   * @param {number} wn Frecuencia natural
+   * @param {number} wn Frecuencia natural (rad/s)
    * @param {number} zeta Coeficiente de amortiguamiento
    */
   setParameters(wn, zeta) {
     if (Number.isFinite(wn) && wn > 0) this.wn = wn;
-    if (Number.isFinite(zeta)) this.zeta = zeta;
+    if (Number.isFinite(zeta) && zeta >= 0) this.zeta = zeta;
   }
 
   /**
-   * Inyecta una perturbación de carga temporal (escalón de fuerza resistiva o par externo).
+   * Inyecta una perturbación de carga externa por un intervalo determinado.
    * @param {number} magnitude Amplitud de la perturbación
    * @param {number} duration Duración en segundos
    */
@@ -48,7 +52,7 @@ export class Plant {
   }
 
   /**
-   * Habilita o deshabilita el ruido pseudo-aleatorio de medición del sensor.
+   * Activa o desactiva el ruido estocástico de medición del sensor.
    * @param {boolean} enabled
    */
   setNoiseEnabled(enabled) {
@@ -56,7 +60,7 @@ export class Plant {
   }
 
   /**
-   * Lee la salida con ruido del sensor si está activo.
+   * Lee la salida medida por el sensor (con ruido si está habilitado).
    * @returns {number}
    */
   getMeasuredOutput() {
@@ -68,26 +72,33 @@ export class Plant {
 
   /**
    * Ejecuta un paso de integración numérica elemental (dt fijo).
-   * Utiliza el método simpléctico / Euler semi-implícito para conservar energía orbital.
-   * @param {number} u Señal de control aplicada
-   * @param {number} dt Paso de integración (segundos, típicamente 0.002 s = 500 Hz)
+   * @param {number} u Señal de control del actuador
+   * @param {number} dt Paso de integración (s)
    */
   step(u, dt) {
+    if (this.hasDiverged) return;
+
     const d = (this.t < this.disturbanceUntil) ? this.disturbance : 0;
 
     // Aceleración: a = y'' = ωn² * (u + d - y) - 2 * ζ * ωn * v
     const wn2 = this.wn * this.wn;
     const accel = wn2 * (u + d - this.y) - 2 * this.zeta * this.wn * this.v;
 
-    // Euler semi-implícito: actualizar primero velocidad, luego posición
-    this.v += accel * dt;
-    this.y += this.v * dt;
-    this.t += dt;
+    // Integración simpléctica (Euler semi-implícito)
+    const nextV = this.v + accel * dt;
+    const nextY = this.y + nextV * dt;
 
-    // Salvaguarda contra divergencias numéricas
-    if (!Number.isFinite(this.y) || !Number.isFinite(this.v)) {
-      this.reset();
+    // Validación rigurosa de integridad numérica (evitar propagación de NaN o desbordamiento físico)
+    if (!Number.isFinite(nextY) || !Number.isFinite(nextV) || Math.abs(nextY) > 1e4 || Math.abs(nextV) > 1e5) {
+      this.hasDiverged = true;
+      this.y = Math.sign(nextY || this.y) * 1e4;
+      this.v = 0;
+      return;
     }
+
+    this.v = nextV;
+    this.y = nextY;
+    this.t += dt;
   }
 
   /**
@@ -100,5 +111,6 @@ export class Plant {
     this.v = 0;
     this.disturbance = 0;
     this.disturbanceUntil = 0;
+    this.hasDiverged = false;
   }
 }

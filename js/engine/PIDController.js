@@ -1,10 +1,12 @@
 /**
  * @file PIDController.js
- * @description Controlador PID de grado industrial con protecciones realistas:
- * 1. Derivada sobre la medición (evita el "derivative kick" ante cambios escalón del setpoint).
- * 2. Filtro pasabajas de primer orden sobre la acción derivativa (suprime ruido de alta frecuencia).
- * 3. Anti-windup por integración condicional (clamping del integrador durante saturación).
- * 4. Límites simétricos de saturación de actuador [-U_MAX, U_MAX].
+ * @description Controlador PID de grado industrial con protecciones formales:
+ * 1. Derivada sobre la medición (elimina el "derivative kick" ante escalones de setpoint).
+ * 2. Filtro pasabajas exacto de primer orden (Tustin / backward-euler discretizado):
+ *    alpha = dt / (tau + dt), matemáticamente estable incluso para dt >= tau.
+ * 3. Anti-windup por Clamping estricto (integración condicional bidireccional):
+ *    Desactiva la integración solo cuando el actuador satura y el error empeora la saturación.
+ * 4. Saturación física simétrica en el actuador [-uMax, uMax].
  */
 
 export class PIDController {
@@ -13,8 +15,8 @@ export class PIDController {
    * @param {number} params.kp Ganancia proporcional
    * @param {number} params.ki Ganancia integral
    * @param {number} params.kd Ganancia derivativa
-   * @param {number} params.uMax Límite de saturación del actuador
-   * @param {number} params.filterTimeConst Constante de tiempo del filtro derivativo (s)
+   * @param {number} params.uMax Límite de saturación física del actuador
+   * @param {number} params.filterTimeConst Constante de tiempo tau del filtro derivativo (s)
    */
   constructor({
     kp = 4.0,
@@ -27,13 +29,14 @@ export class PIDController {
     this.ki = ki;
     this.kd = kd;
     this.uMax = uMax;
-    this.filterTimeConst = filterTimeConst;
+    this.tau = filterTimeConst;
 
     // Estados internos del controlador
     this.integral = 0;
     this.prevMeasurement = 0;
     this.dFiltered = 0;
     this.isSaturated = false;
+    this.initialized = false;
   }
 
   setGains(kp, ki, kd) {
@@ -43,43 +46,64 @@ export class PIDController {
   }
 
   /**
-   * Calcula la señal de control u(t) para el paso actual.
-   * @param {number} setpoint Valor deseado r(t)
-   * @param {number} measuredOutput Valor medido y(t)
+   * Calcula la señal de control u(t) para el paso de integración actual.
+   * @param {number} setpoint Referencia r(t)
+   * @param {number} measuredOutput Salida medida y(t)
    * @param {number} dt Paso de tiempo (s)
    * @returns {{ u: number, error: number, saturated: boolean, dFiltered: number, integral: number }}
    */
   compute(setpoint, measuredOutput, dt) {
+    if (dt <= 1e-9) {
+      return {
+        u: 0,
+        error: setpoint - measuredOutput,
+        saturated: this.isSaturated,
+        dFiltered: this.dFiltered,
+        integral: this.integral
+      };
+    }
+
+    if (!this.initialized) {
+      this.prevMeasurement = measuredOutput;
+      this.initialized = true;
+    }
+
     const error = setpoint - measuredOutput;
 
     // 1. Acción derivativa sobre la medición: rawD = -dy/dt
-    // Se invierte el signo para que responda a la tasa de variación de la salida sin brincos por setpoint
-    const rawD = (dt > 1e-9) ? -(measuredOutput - this.prevMeasurement) / dt : 0;
+    const deltaY = measuredOutput - this.prevMeasurement;
     this.prevMeasurement = measuredOutput;
+    const rawD = -deltaY / dt;
 
-    // Filtro pasabajas discreto de primer orden: dFiltered += (rawD - dFiltered) * alpha
-    const alpha = (dt > 0) ? Math.min(1.0, dt / Math.max(1e-4, this.filterTimeConst)) : 1.0;
-    this.dFiltered += (rawD - this.dFiltered) * alpha;
+    // Filtro pasabajas discretizado exacto: alpha = dt / (tau + dt)
+    // Garantiza 0 < alpha <= 1 para cualquier dt > 0 y tau >= 0 sin divergencia
+    const effectiveTau = Math.max(1e-4, this.tau);
+    const alpha = dt / (effectiveTau + dt);
+    this.dFiltered += alpha * (rawD - this.dFiltered);
 
-    // 2. Cálculo previo de salida para verificar saturación
+    // 2. Componentes proporcional y derivativa
     const uProportional = this.kp * error;
     const uDerivative = this.kd * this.dFiltered;
-    let uUnclamped = uProportional + (this.ki * this.integral) + uDerivative;
 
-    // 3. Anti-windup por integración condicional:
-    // Solo integrar si NO está saturado, O si el signo del error tiende a desaturar el actuador
-    const isActuatorSaturated = Math.abs(uUnclamped) >= this.uMax;
-    const helpsDesaturate = Math.sign(error) !== Math.sign(uUnclamped);
+    // 3. Salida tentativa previa a saturación (con integrador actual)
+    const uCandidate = uProportional + (this.ki * this.integral) + uDerivative;
 
-    if (!isActuatorSaturated || helpsDesaturate) {
+    // 4. Anti-windup por Clamping condicional formal:
+    // Identificar si satura en cota superior o inferior
+    const saturatedHigh = uCandidate >= this.uMax;
+    const saturatedLow = uCandidate <= -this.uMax;
+    this.isSaturated = saturatedHigh || saturatedLow;
+
+    // Solo se integra si el actuador no está saturado O si el signo del error tiende a reducir la saturación
+    const errorRelievesHighSaturation = saturatedHigh && error < 0;
+    const errorRelievesLowSaturation = saturatedLow && error > 0;
+
+    if (!this.isSaturated || errorRelievesHighSaturation || errorRelievesLowSaturation) {
       this.integral += error * dt;
-      // Recalcular con el nuevo valor integral
-      uUnclamped = uProportional + (this.ki * this.integral) + uDerivative;
     }
 
-    // 4. Saturación física del actuador
-    const uSaturated = Math.max(-this.uMax, Math.min(this.uMax, uUnclamped));
-    this.isSaturated = (Math.abs(uSaturated) >= this.uMax - 1e-4);
+    // 5. Saturación física del actuador
+    const uSaturated = Math.max(-this.uMax, Math.min(this.uMax, uProportional + (this.ki * this.integral) + uDerivative));
 
     return {
       u: uSaturated,
@@ -91,7 +115,7 @@ export class PIDController {
   }
 
   /**
-   * Reinicia los estados del integrador y derivador.
+   * Reinicia los estados internos a condiciones de reposo.
    * @param {number} initialMeasurement
    */
   reset(initialMeasurement = 0) {
@@ -99,5 +123,6 @@ export class PIDController {
     this.prevMeasurement = initialMeasurement;
     this.dFiltered = 0;
     this.isSaturated = false;
+    this.initialized = false;
   }
 }
