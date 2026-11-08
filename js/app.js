@@ -184,8 +184,7 @@ class PIDLabApp {
   }
 
   exportCSV() {
-    const csvContent = this.ringBuffer.toCSV();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = this.ringBuffer.toBlob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -232,7 +231,8 @@ class PIDLabApp {
             this.DT,
             ctrl.saturated,
             this.plant.wn,
-            this.plant.zeta
+            this.plant.zeta,
+            this.plant.hasDiverged
           );
 
           this.timeSinceLastSample += this.DT;
